@@ -227,7 +227,7 @@ def make_cookie_problem(t_span: tuple, p:int = 101, c0: int = 0, cp:int = 100) -
     """
     # IMPORT DATA
     import scipy.io as spio
-    problem_cookie = spio.loadmat('/Users/benjamincarrel/Documents/UNIGE/PhD/Code/DLRA/src/IVPs/data/parametric_cookie_2x2_1580.mat')
+    problem_cookie = spio.loadmat('~/src/IVPs/data/parametric_cookie_2x2_1580.mat')
 
     # DEFINE MATRICES
     A_all = problem_cookie["A"][0]  # all the A
