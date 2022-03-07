@@ -2,8 +2,8 @@
 
 ## Abstract
 
-The Parareal algorithm is a well-known time parallel algorithm for evolution problems. It is based on a Newton-like iteration, with cheap coarse corrections performed sequentially, and expensive fine solves performed in parallel.
-We are interested here in evolution problems that admit good low-rank approximations, and where the dynamical low-rank approximation (DLRA), proposed by Koch and Lubich, can be used as time stepper. Many discrete integrators for DLRA have recently been proposed, like the projector-splitting methods and the projected Runge-Kutta methods. The cost and accuracy in DLRA are mostly governed by the rank chosen for the approximation. We want to use these properties in a new method that we call low-rank Parareal, in order to obtain time parallel DLRA solvers for evolution problems. We propose an analysis of the algorithm on linear problems, and illustrate our results numerically.
+The Parareal algorithm of Lions, Maday, and Turinici is a well-known time parallel algorithm for evolution problems. It is based on a Newton-like iteration, with cheap coarse corrections performed sequentially, and expensive fine solves performed in parallel.
+  In this work, we apply Parareal to evolution problems that admit good low-rank approximations and for which the dynamical low-rank approximation (DLRA), proposed by Koch and Lubich, can be used as time stepper. Many discrete integrators for DLRA have recently been proposed, based on splitting the projected vector field or by applying projected Runge--Kutta methods. The cost and accuracy of these methods are mostly governed by the rank chosen for the approximation. We want to use these properties in a new method, that we call low-rank Parareal, in order to obtain a time-parallel DLRA solver for evolution problems. We propose an analysis of the algorithm on affine linear problems and illustrate our results numerically.
 
 ## Authors
 
