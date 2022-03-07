@@ -20,6 +20,21 @@ The Parareal algorithm of Lions, Maday, and Turinici is a well-known time parall
 The following instructions worked as of 7th March 2022.
 First, clone this folder in your computer.
 
+### General
+
+In a more general setting, what you have to do is:
+
+- Clone this repo on your computer
+- Install Python (3.10) with the following packages:
+  - numpy (1.22)
+  - scipy (1.8)
+  - matplotlib (3.5)
+  - jupyter (1.0)
+  - tqdm (4.63)
+- Add the folder src to your path to be able to import the code inside
+
+Then, you should be able to run the files of the experiments.
+
 ### Conda
 
 With your terminal, go to this folder and create a conda environment with
