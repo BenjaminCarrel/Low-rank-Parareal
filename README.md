@@ -48,8 +48,8 @@ Apple Silicon requires a specific manipulation to install the fastest version of
 Then, create the conda environment with
 
 ```
-conda create -n low-rank_parareal
-conda activate low-rank_parareal
+conda create -n low-rank-parareal
+conda activate low-rank-parareal
 ```
 
 Then, install numpy
@@ -92,14 +92,14 @@ A nice animation of the algorithm's behaviour is made in `convergence_animation.
 The Cookie experiments are in the folder `cookie`.
 
 - The plots of singular values come from `cookie/singular_values.py`
-- The plots of several ranks come from `cookie/several_ranks.py
+- The plots of several ranks come from `cookie/several_ranks.py`
 
 ### Riccati
 
 The Riccati experiments are in the folder `riccati`.
 
 - The plots of singular values come from `riccati/singular_values.py`
-- The plots of several ranks come from `riccati/several_ranks.py
+- The plots of several ranks come from `riccati/several_ranks.py`
 
 
 
