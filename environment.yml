@@ -1,0 +1,13 @@
+name: low-rank_parareal
+channels:
+    - conda-forge
+dependencies:
+    - python=3.10
+    - pip
+    - numpy
+    - scipy
+    - matplotlib
+    - tqdm
+    - jupyter
+    - autopep8
+    - conda-build
