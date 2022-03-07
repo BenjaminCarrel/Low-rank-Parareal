@@ -18,11 +18,10 @@ The Parareal algorithm of Lions, Maday, and Turinici is a well-known time parall
 ## Installation
 
 The following instructions worked as of 7th March 2022.
-First, clone this folder in your computer.
 
 ### General
 
-In a more general setting, what you have to do is:
+The general installation setting is:
 
 - Clone this repo on your computer
 - Install Python (3.10) with the following packages:
