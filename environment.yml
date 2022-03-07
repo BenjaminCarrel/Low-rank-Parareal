@@ -1,4 +1,4 @@
-name: low-rank_parareal
+name: low-rank-parareal
 channels:
     - conda-forge
 dependencies:
