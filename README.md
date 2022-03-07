@@ -17,7 +17,8 @@ The Parareal algorithm of Lions, Maday, and Turinici is a well-known time parall
 
 ## Installation
 
-Clone this folder in your computer.
+The following instructions worked as of 7th March 2022.
+First, clone this folder in your computer.
 
 ### Conda
 
@@ -68,6 +69,37 @@ conda install scipy jupyter tqdm matplotlib conda-build
 conda develop src
 ```
 
+## Experiments
+
+The experiments made in the paper can be reproduced as follows.
+All parameters are set by default as described in the paper.
+Running the files described below should produce the exact same figures as in the paper.
+
+### Lyapunov
+
+The Lyapunov experiments are in the folder `lyapunov`. 
+
+- The plots of singular values and solution come from `lyapunov/singular_values.py`.
+- The plots of several coarse ranks and several fine ranks come from `lyapunov/several_ranks.py`
+- The plot of several problem sizes comes from `lyapunov/several_sizes.py`
+- The plot of several final times comes from `lyapunov/several_times.py`
+
+A nice animation of the algorithm's behaviour is made in `convergence_animation.py`
+
+
+### Cookie
+
+The Cookie experiments are in the folder `cookie`.
+
+- The plots of singular values come from `cookie/singular_values.py`
+- The plots of several ranks come from `cookie/several_ranks.py
+
+### Riccati
+
+The Riccati experiments are in the folder `riccati`.
+
+- The plots of singular values come from `riccati/singular_values.py`
+- The plots of several ranks come from `riccati/several_ranks.py
 
 
 
