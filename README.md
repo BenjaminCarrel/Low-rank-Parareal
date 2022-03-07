@@ -31,7 +31,7 @@ In a more general setting, what you have to do is:
   - matplotlib (3.5)
   - jupyter (1.0)
   - tqdm (4.63)
-- Add the folder src to your path to be able to import the code inside
+- Add the folder `src` to your python path to be able to import the code inside
 
 Then, you should be able to run the files of the experiments.
 
