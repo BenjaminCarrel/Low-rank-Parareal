@@ -46,8 +46,10 @@ Then, activate the environment with
 
 Clone the repo
 
-`git clone https://github.com/BenjaminCarrel/Low-rank-Parareal.git`
-`cd Low-rank-Parareal`
+```
+git clone https://github.com/BenjaminCarrel/Low-rank-Parareal.git
+cd Low-rank-Parareal
+```
 
 Finally, add the source folder to the path by running the command
 
