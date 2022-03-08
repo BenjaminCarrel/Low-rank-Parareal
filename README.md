@@ -94,7 +94,9 @@ conda develop src
 
 The experiments made in the paper can be reproduced as follows.
 All parameters are set by default as described in the paper.
-Running the files described below should produce the exact same figures as in the paper.
+Running the files described below should produce the same figures as in the paper.
+
+/!\ Beware that some of the scripts below take a long time to run since they are intended to investigate the behaviour of the integrator for multiple choices of the parameters. /!\
 
 ### Lyapunov
 
