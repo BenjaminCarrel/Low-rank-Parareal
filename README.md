@@ -19,6 +19,13 @@ The Parareal algorithm of Lions, Maday, and Turinici is a well-known time parall
 
 The following instructions worked as of 7th March 2022.
 
+First of all, clone this repositery with
+
+```
+git clone https://github.com/BenjaminCarrel/Low-rank-Parareal.git
+cd Low-rank-Parareal
+```
+
 ### General
 
 The general installation setting is:
@@ -43,13 +50,6 @@ With your terminal, go to this folder and create a conda environment with
 Then, activate the environment with
 
 `conda activate low-rank_parareal`
-
-Clone the repo
-
-```
-git clone https://github.com/BenjaminCarrel/Low-rank-Parareal.git
-cd Low-rank-Parareal
-```
 
 Finally, add the source folder to the path by running the command
 
