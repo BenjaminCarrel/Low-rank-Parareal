@@ -4,6 +4,10 @@
 __pycache__/
 .ipynb_checkpoints/
 .venv
+*.egg-info
+build/
+
+
 
 # Notebooks are built/synced using Jupytext
 *.ipynb
