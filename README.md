@@ -62,9 +62,9 @@ You can update your environment with
 
 ### Apple Silicon
 
-Apple Silicon requires a specific manipulation to install the fastest version of numpy. Make sure that your version of conda is compatible with Apple Silicon. This can be done by installing miniforge3 with homebrew
+Apple Silicon requires a specific manipulation to install the fastest version of numpy. Make sure that your version of conda is compatible with Apple Silicon. This can be done by installing miniforge with homebrew
 
-`brew install miniforge3`
+`brew install miniforge`
 
 Then, create the conda environment with
 
@@ -73,14 +73,10 @@ conda create -n low-rank-parareal
 conda activate low-rank-parareal
 ```
 
-Then, install numpy
+Then, install numpy and scipy with fast BLAS
 
 ```
-# install numpy optimized for macOS
-conda install cython pybind11
-pip3 install --no-binary :all: --no-use-pep517 numpy
-# for not reinstalling numpy for other packages
-conda config --set pip_interop_enabled true
+conda install numpy scipy "libblas=*=*accelerate"
 ```
 
 Finally, install other packages and add `src` to the path
@@ -96,7 +92,7 @@ The experiments made in the paper can be reproduced as follows.
 All parameters are set by default as described in the paper.
 Running the files described below should produce the same figures as in the paper.
 
-/!\ Beware that some of the scripts below take a long time to run since they are intended to investigate the behaviour of the integrator for multiple choices of the parameters. /!\
+/!\ Beware that some of the scripts below take a long time to run since they are intended to investigate the behavior of the integrator for multiple choices of the parameters. /!\
 
 ### Lyapunov
 
@@ -107,7 +103,7 @@ The Lyapunov experiments are in the folder `lyapunov`.
 - The plot of several problem sizes comes from `lyapunov/several_sizes.py`
 - The plot of several final times comes from `lyapunov/several_times.py`
 
-A nice animation of the algorithm's behaviour is made in `convergence_animation.py`
+A nice animation of the algorithm's behavior is made in `convergence_animation.py`
 
 
 ### Cookie
