@@ -166,7 +166,9 @@ def Low_Rank_Parareal(PB: GeneralIVP,
     ## INITIAL APPROXIMATION -> COARSE INTEGRATION
     for n in range(N):
         Gnk[n + 1, 0] = coarse_solver(ts[n: n + 2], Ynk[n, 0])
-        Ynk[n + 1, 0] = Gnk[n + 1, 0]
+        # Ynk[n + 1, 0] = Gnk[n + 1, 0] 
+        small_matrix = svd.generate_low_rank_matrix(Y0.shape, singular_values=np.logspace(-13, -14, fine_rank - coarse_rank), is_symmetric=True)
+        Ynk[n + 1, 0] = Gnk[n + 1, 0] + small_matrix
         
     ## PARAREAL ITERATION
     for k in tqdm(range(N), desc=f"Low-rank Parareal"):
