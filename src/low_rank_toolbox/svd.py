@@ -238,10 +238,13 @@ def add_svd(list_of_SVD: List[SVD]) -> SVD:
     Q1, R1 = np.linalg.qr(left, mode="reduced")
     Q2, R2 = np.linalg.qr(right, mode="reduced")
     middle = np.linalg.multi_dot([R1, mid, R2.T])
-    U, S, Vt = np.linalg.svd(middle, full_matrices=False)
-    U = Q1.dot(U)
-    Vt = Vt.dot(Q2.T)
-    return SVD(U, S, Vt)
+    # U, S, Vt = np.linalg.svd(middle, full_matrices=False)
+    # U = Q1.dot(U)
+    # Vt = Vt.dot(Q2.T)
+    # output = SVD(U, S, Vt)
+    USVt = truncated_svd(middle)
+    output = USVt.dot(Q1, side='opposite').dot(Q2.T)
+    return output
 
 
 def dot_svd(left_matrix: SVD, right_matrix: SVD) -> SVD:
@@ -265,7 +268,7 @@ def reduced_svd(X: ArrayLike) -> SVD:
     (U, s, Vt) = la.svd(X, full_matrices=False)
     return SVD(U, s, Vt)
 
-def truncated_svd(X: ArrayLike, k:int, tol: float = None) -> SVD:
+def truncated_svd(X: ArrayLike, k:int = None, tol: float = 1e-15) -> SVD:
     "Shortcut for numpy's SVD"
     (U, s, Vt) = la.svd(X, full_matrices=False)
     return SVD(U, s, Vt).truncate(k, tol)
@@ -333,4 +336,22 @@ def subspace_iteration(X: Union[ArrayLike, spmatrix, LowRankMatrix], k:int, nb_i
     for _ in np.arange(nb_iter):
         Q, _ = la.qr(X.dot(X.T.dot(Q)), mode='reduced')
     return Q
-# %%
+
+
+# %% GENERATE RANDOM LOW-RANK MATRICES
+def generate_low_rank_matrix(shape: tuple,
+                             singular_values: list,
+                             is_symmetric: bool = True):
+    "Generate a low-rank matrix with an exponential decay"
+    rank = len(singular_values)
+    M1 = np.random.randn(shape[0], rank)
+    U, _ = la.qr(M1, mode='reduced')
+    if is_symmetric:
+        V = U
+    else:
+        M2 = np.random.randn(shape[1], rank)
+        V, _ = la.qr(M2, mode='reduced')
+
+    S = np.diag(singular_values)
+    return SVD(U, S, V.T)
+    
