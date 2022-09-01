@@ -4,6 +4,7 @@ import numpy as np
 from typing import List, Optional, Sequence, Tuple, Type, Union
 from numpy.typing import ArrayLike
 import scipy.sparse.linalg as spala
+from scipy.sparse import spmatrix
 
 
 class LowRankMatrix:
@@ -106,7 +107,7 @@ class LowRankMatrix:
 
     #%% MATRIX MULTIPLICATIONS
     def dot(self,
-            other: Union[LowRankMatrix, ArrayLike],
+            other: Union[LowRankMatrix, ArrayLike, spmatrix],
             side: str = 'usual',
             dense_output: bool = False) -> Union[ArrayLike, LowRankMatrix]:
         """Matrix and vector multiplication
@@ -119,6 +120,10 @@ class LowRankMatrix:
         # MATRIX-VECTOR CASE
         if len(other.shape) == 1:
             dense_output = True
+            
+        # SPARSE MATRIX CASE
+        if isinstance(other, spmatrix):
+            return self.dot_sparse(other, side, dense_output)
 
         if dense_output:
             if side == 'usual':
@@ -141,7 +146,7 @@ class LowRankMatrix:
     __matmul__ = dot
 
     def dot_sparse(self,
-                   sparse_other: ArrayLike,
+                   sparse_other: spmatrix,
                    side: str = 'usual',
                    dense_output: bool = False) -> Union[ArrayLike, LowRankMatrix]:
         """
@@ -162,21 +167,22 @@ class LowRankMatrix:
         return new_matrix
 
     def expm_multiply(self,
-                      A: ArrayLike,
+                      A: spmatrix,
                       h: float,
                       side: str = 'left',
-                      dense_output: bool = False) -> Union[ArrayLike, LowRankMatrix]:
+                      dense_output: bool = False,
+                      traceA: float = None) -> Union[ArrayLike, LowRankMatrix]:
         """
-        Efficient exponential matrix multiplication
+        Efficient action of sparse matrix exponential
         left: output = exp(h*A) @ matrix
         right: output = matrix @ exp(h*A)
         """
         A = A.tocsc()  # sanity check
         new_matrix = self.copy()
         if side == 'left':
-            new_matrix._matrices[0] = spala.expm_multiply(A, new_matrix._matrices[0], start=0, stop=h, num=2, endpoint=True)[-1]
+            new_matrix._matrices[0] = spala.expm_multiply(A, new_matrix._matrices[0], start=0, stop=h, num=2, endpoint=True, traceA=traceA)[-1]
         elif side == 'right':
-            new_matrix._matrices[-1] = spala.expm_multiply(A.T, new_matrix._matrices[-1].T, start=0, stop=h, num=2, endpoint=True)[-1].T
+            new_matrix._matrices[-1] = spala.expm_multiply(A.T, new_matrix._matrices[-1].T, start=0, stop=h, num=2, endpoint=True, traceA=traceA)[-1].T
         else:
             raise ValueError('incorrect side')
         if dense_output:

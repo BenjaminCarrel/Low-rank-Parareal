@@ -5,6 +5,7 @@ from typing import Union, List, Optional, Tuple
 from low_rank_toolbox.low_rank_matrix import LowRankMatrix
 import numpy as np
 import numpy.linalg as la
+import scipy as sp
 from scipy.linalg import block_diag
 from numpy.typing import ArrayLike
 from scipy.sparse import spmatrix
@@ -165,18 +166,41 @@ class SVD(LowRankMatrix):
         new_mat.Vt = new_mat.Vt[r:, :]
         return new_mat
         
-        
+    def project_left_space(self, other: Union[ArrayLike, LowRankMatrix]) -> Union[ArrayLike, LowRankMatrix]:
+        "Projection of other onto the left space spanned by U"
+        return other.T.dot(self.U).dot(self.U.T).T
+    
+    def project_right_space(self, other: Union[ArrayLike, LowRankMatrix]) -> Union[ArrayLike, LowRankMatrix]:
+        "Projection of other onto the right space spanned by V"
+        return other.dot(self.Vt.T).dot(self.Vt)
     
     def project_onto_tangent_space(self, other: Union[ArrayLike, LowRankMatrix]) -> SVD:
-        "Projection of other onto the tangent space at self"
-        M1 = copy.deepcopy(other)
-        M2 = copy.deepcopy(other)
-        M3 = copy.deepcopy(other)
-        M1._matrices[0] = self.U.dot(self.U.T.dot(other))
-        M2._matrices[0] = M1._matrices[0]
-        M2._matrices[-1] = self.Vt.dot(self.Vt.T.dot(other.T)).T
-        M3._matrices[-1] = M2._matrices[-1]
-        return add_svd([M1, -M2, M3])
+        """Projection of other onto the tangent space at self
+        
+        The formula is given by:
+        PGX = UUt X - UUt X VVt + X VVt
+
+        Args:
+            other (Union[ArrayLike, SVD]): matrix to project
+        """
+        U, V = self.U, self.Vt.T
+        
+        # efficient computation -> directly compute a matrix of rank at most 2r
+        # STEP 1 : FACTORIZATION
+        if isinstance(other, LowRankMatrix):
+            XV = other.dot(V, dense_output=True)
+            UtX = other.dot(U.T, side='opposite', dense_output=True)
+        else:
+            XV = other.dot(V)
+            UtX = U.T.dot(other)
+        UtXVVt = np.linalg.multi_dot([U.T, XV, V.T])
+        M1 = np.column_stack([U, XV])
+        M2 = np.row_stack([UtX - UtXVVt, V.T])
+        # STEP 2 : DOUBLE QR  (n times 2k)
+        Q1, R1 = la.qr(M1, mode='reduced')
+        Q2, R2 = la.qr(M2.T, mode='reduced')
+        USVt = SVD(Q1, R1.dot(R2.T), Q2.T)
+        return USVt
 
     def norm(self) -> float:
         """Calculate Frobenius norm"""
@@ -230,18 +254,15 @@ def add_svd(list_of_SVD: List[SVD]) -> SVD:
         list_of_V[k] = list_of_SVD[k].Vt.T
 
     # First, concatenate matrices
-    left = np.concatenate(list_of_U, axis=1)
+    left = np.column_stack(list_of_U)
     mid = block_diag(*list_of_S)
-    right = np.concatenate(list_of_V, axis=1)
+    right = np.column_stack(list_of_V)
 
     # Second, do two QRs and SVD in the middle
     Q1, R1 = np.linalg.qr(left, mode="reduced")
     Q2, R2 = np.linalg.qr(right, mode="reduced")
     middle = np.linalg.multi_dot([R1, mid, R2.T])
-    # U, S, Vt = np.linalg.svd(middle, full_matrices=False)
-    # U = Q1.dot(U)
-    # Vt = Vt.dot(Q2.T)
-    # output = SVD(U, S, Vt)
+    # USVt = reduced_svd(middle)
     USVt = truncated_svd(middle)
     output = USVt.dot(Q1, side='opposite').dot(Q2.T)
     return output
@@ -268,8 +289,8 @@ def reduced_svd(X: ArrayLike) -> SVD:
     (U, s, Vt) = la.svd(X, full_matrices=False)
     return SVD(U, s, Vt)
 
-def truncated_svd(X: ArrayLike, k:int = None, tol: float = 1e-15) -> SVD:
-    "Shortcut for numpy's SVD"
+def truncated_svd(X: ArrayLike, k: int = None, tol: float = 1e-15) -> SVD:
+    "Shortcut for numpy's SVD and truncation"
     (U, s, Vt) = la.svd(X, full_matrices=False)
     return SVD(U, s, Vt).truncate(k, tol)
 
@@ -337,21 +358,20 @@ def subspace_iteration(X: Union[ArrayLike, spmatrix, LowRankMatrix], k:int, nb_i
         Q, _ = la.qr(X.dot(X.T.dot(Q)), mode='reduced')
     return Q
 
-
 # %% GENERATE RANDOM LOW-RANK MATRICES
 def generate_low_rank_matrix(shape: tuple,
                              singular_values: list,
-                             is_symmetric: bool = True):
+                             seed: int = 1234,
+                             is_symmetric: bool = False):
     "Generate a low-rank matrix with an exponential decay"
+    np.random.seed(seed) # for reproducibility
     rank = len(singular_values)
-    M1 = np.random.randn(shape[0], rank)
-    U, _ = la.qr(M1, mode='reduced')
+    M1 = np.random.rand(shape[0], rank)
+    U, _ = sp.linalg.qr(M1, mode='economic')
     if is_symmetric:
         V = U
     else:
-        M2 = np.random.randn(shape[1], rank)
-        V, _ = la.qr(M2, mode='reduced')
-
+        M2 = np.random.rand(shape[1], rank)
+        V, _ = sp.linalg.qr(M2, mode='economic')
     S = np.diag(singular_values)
     return SVD(U, S, V.T)
-    

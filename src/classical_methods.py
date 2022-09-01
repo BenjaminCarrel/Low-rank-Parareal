@@ -1,12 +1,11 @@
-
 import warnings
 import numpy as np
 from numpy.typing import ArrayLike
 from scipy.integrate import solve_ivp
 from low_rank_toolbox import svd
 
-from IVPs.General import GeneralIVP
-from RK_table import RK_rule
+from ivps.general import GeneralIVP
+from rk_table import RK_rule
 from typing import Union
 from low_rank_toolbox.low_rank_matrix import LowRankMatrix
 from low_rank_toolbox.svd import SVD
@@ -15,7 +14,8 @@ from low_rank_toolbox.svd import SVD
 # SOLUTION BY SCIPY
 def solve_by_scipy(problem: GeneralIVP,
                    t_span: tuple,
-                   X0: ArrayLike) -> ArrayLike:
+                   X0: ArrayLike,
+                   scipy_method: str = 'RK45') -> ArrayLike:
     """
     Solve the selected ODE with scipy.
     """
@@ -30,7 +30,7 @@ def solve_by_scipy(problem: GeneralIVP,
     vec_ode = problem.vec_ode
     
     # COMPUTE SOLUTION
-    sol = solve_ivp(vec_ode, t_span, X0, 'RK45', atol=1e-13, rtol=1e-13)
+    sol = solve_ivp(vec_ode, t_span, X0, method=scipy_method, atol=1e-13, rtol=1e-13)
     X1 = np.reshape(sol.y[:, -1], shape)
     return X1
 
@@ -54,7 +54,11 @@ def solve_by_optimal(problem: GeneralIVP,
     if problem.is_closed_form_available:
         sol = solve_by_closed_form(problem, t_span, X0)
     else:
-        sol = solve_by_scipy(problem, t_span, X0)
+        sol = solve_by_scipy(problem, t_span, X0, scipy_method='RK45')
+        # if problem.is_stiff:
+        #     sol = solve_by_scipy(problem, t_span, X0, scipy_method='Radau')
+        # else:
+        #     sol = solve_by_scipy(problem, t_span, X0, scipy_method='RK45')
     return sol
 
 # BEST RANK SOLUTION
@@ -84,20 +88,20 @@ def solve_best_rank(problem: GeneralIVP,
 def solve_by_explicit_Runge_Kutta(problem: GeneralIVP,
                                   t_span: tuple,
                                   X0: ArrayLike,
-                                  s: int = 4) -> ArrayLike:
+                                  order: int = 4) -> ArrayLike:
     """Explicit Runge-Kutta methods
 
     Args:
-        problem (GeneralIVP): Problem of interest. Solve the current type of ODE.
+        problem (generalIVP): Problem of interest. Solve the current type of ODE.
         t_span (tuple): Time interval
         X0 (ArrayLike): Initial value
         s (int, optional): Order of the method. Defaults to 4.
     """
     # VARIABLES
-    a, b, c = RK_rule(s)
+    a, b, c = RK_rule(order)
     shape = X0.shape
-    eta = np.zeros((s, *shape))
-    kappa = np.zeros((s, *shape))
+    eta = np.zeros((order, *shape), dtype=problem.dtype)
+    kappa = np.zeros((order, *shape), dtype=problem.dtype)
     h = t_span[1] - t_span[0]
 
     # INITIALIZATION
@@ -105,9 +109,10 @@ def solve_by_explicit_Runge_Kutta(problem: GeneralIVP,
     kappa[0] = problem.ode(t_span[0], X0)
 
     # RUNGE KUTTA LOOP
-    for j in np.arange(0, s):
-        eta[j] = X0 + h * np.sum(a[j, l] * kappa[l] for l in range(j))
+    for j in np.arange(0, order):
+        eta[j] = X0 + h * sum(a[j, l] * kappa[l] for l in np.arange(j))
         tj = t_span[0] + h * c[j]
         kappa[j] = problem.ode(tj, eta[j])
-    X1 = X0 + h * sum(b[j] * kappa[j] for j in range(s))
+    X1 = X0 + h * sum(b[j] * kappa[j] for j in np.arange(order))
     return X1
+

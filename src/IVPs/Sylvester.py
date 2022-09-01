@@ -1,4 +1,5 @@
 # %% IMPORTATIONS
+import warnings
 import numpy as np
 import numpy.linalg as la
 import scipy as sp
@@ -8,7 +9,7 @@ import scipy.linalg as sla
 import krylov
 from scipy.sparse import spmatrix
 from numpy.typing import ArrayLike
-from IVPs.General import GeneralIVP
+from ivps.general import GeneralIVP
 from low_rank_toolbox import svd
 from low_rank_toolbox.svd import SVD
 from low_rank_toolbox import low_rank_matrix
@@ -19,45 +20,73 @@ from typing import Union, Optional
 # %% CLASS SYLVESTER
 class SylvesterIVP(GeneralIVP):
     """
-    Subclass of GeneralProblem. Specific for the Sylvester equation.
+    Subclass of generalProblem. Specific for the sylvester equation.
 
-    Sylvester equation :
-        .. math::
-            \dot{Ys}(t) = A Ys(t) + Ys(t) B + C C^T.
-    The initial value is given by :math:`Ys(t_0) = Y_0`
+    Sylvester differential equation : Y'(t) = A Y(t) + Y(t) B + C.
+    Initial value given by Y(t_0) = Y0.
+    
+    Y0 and C are low-rank matrices.
     """
-
+    # ATTRIBUTES
     is_closed_form_available = True
+    name = 'Sylvester'
+    is_stiff = False
 
-    # %% INIT FUNCTION
     def __init__(self,
                  t_span: tuple,
                  Y0: SVD,
-                 A: ArrayLike,
-                 B: ArrayLike,
-                 C: ArrayLike):
+                 A: Union[ArrayLike, spmatrix],
+                 B: Union[ArrayLike, spmatrix],
+                 C: SVD):
+        """Initialize a Sylvester problem of the form Y' = AY + BY + C
+
+        Args:
+            t_span (tuple): time interval
+            Y0 (Union[ArrayLike, LowRankMatrix]): (low-rank) initial value
+            A (Union[ArrayLike, spmatrix]): (sparse) matrix A of the problem
+            B (Union[ArrayLike, spmatrix]): (sparse) matrix B of the problem
+            C (Union[ArrayLike, LowRankMatrix]): (low-rank) matrix C of the problem
+        """
+        # SANITY CHECK
+        if not isinstance(Y0, SVD):
+            warnings.warn('Initial value not low-rank -> converted into low-rank matrix')
+            Y0 = svd.truncated_svd(Y0)
+        if not isinstance(C, SVD):
+            warnings.warn('Source not low-rank -> converted into low-rank matrix')
+            C = svd.truncated_svd(C)
+        
         # SPECIFIC PROPERTIES
-        self.A = A.tocsc()
-        self.B = B.tocsc()
-        self.C = C
+        self.A, self.B, self.C = A, B, C
+        
         # INITIALIZATION
         GeneralIVP.__init__(self, None, t_span, Y0)
 
-        # SOME SPECIFIC PREPROCESSING
-        # computed only once so its ok
-        UC, RC = la.qr(self.C, mode='reduced')
-        SC = RC.dot(RC.T)
-        self.CCt = SVD(UC, SC, UC.T)
-        self.spluA = sp.sparse.linalg.splu(self.A)
-        self.spluB = sp.sparse.linalg.splu(self.B)
+        # PRE-PROCESSING
+        if isinstance(A, spmatrix):
+            self.A = A.tocsc()
+        #     self.spluA = sp.sparse.linalg.splu(self.A)
+        # else:
+        #     self.spluA = None
+        if isinstance(B, spmatrix):
+            self.B = B.tocsc()
+        #     self.spluB = sp.sparse.linalg.splu(self.B)
+        # else:
+        #     self.spluB = None
+        
+    @property
+    def spluA(self):
+        "LU cannot be copied (pickle)... Need to fix this somehow"
+        return sp.sparse.linalg.splu(self.A)
 
-    # %% SELECTION OF ODE
+    def spluB(self):
+        return sp.sparse.linalg.splu(self.B)
+        
     def select_ode(self,
                    initial_value: SVD,
                    ode_type: str,
                    mats_UV: tuple = ()):
         """
-        Select the current ode, and precompute specific data for the Lyapunov ODEs.
+        Select the current ode, and pre-compute specific data for the lyapunov ODEs.
         """
         # SELECT ODE
         GeneralIVP.select_ode(self, initial_value, ode_type, mats_UV)
@@ -67,61 +96,65 @@ class SylvesterIVP(GeneralIVP):
             None
         elif ode_type == "K":
             (V,) = mats_UV
-            self.VtBV = np.linalg.multi_dot([V.T, B.dot(V)])
-            self.CCtV = np.linalg.multi_dot([C, C.T, V])
+            self.VtBV = V.T.dot(B.dot(V))
+            self.CV = C.dot(V).todense()
         elif ode_type == "L":
             (U,) = mats_UV
-            self.UtAU = np.linalg.multi_dot([U.T, A.dot(U)])
-            self.CCtU = np.linalg.multi_dot([C, C.T, U])
+            self.UtAU = U.T.dot(A.dot(U))
+            self.CU = C.dot(U).todense()
         else:
             U, V = mats_UV
-            self.UtAU = np.linalg.multi_dot([U.T, A.dot(U)])
-            self.VtBV = np.linalg.multi_dot([V.T, B.dot(V)])
-            self.UtCCtV = np.linalg.multi_dot([U.T, C, C.T, V])
+            self.UtAU = U.T.dot(A.dot(U))
+            self.VtBV = V.T.dot(B.dot(V))
+            self.UtCV = C.dot(V).dot(U.T, side='opposite').todense()
 
-    # %% VECTOR FIELDS
+    ## VECTOR FIELDS
     def ode_F(self, t: float, X: ArrayLike) -> ArrayLike:
-        dY = self.A.dot(X) + (self.B.T.dot(X.T)).T + self.C.dot(self.C.T)
+        dY = self.A.dot(X) + (self.B.T.dot(X.T)).T + self.C.todense()
         return dY
 
     def ode_K(self, t: float, K: ArrayLike) -> ArrayLike:
-        dK = self.A.dot(K) + K.dot(self.VtBV) + self.CCtV
+        dK = self.A.dot(K) + K.dot(self.VtBV) + self.CV
         return dK
 
     def ode_L(self, t: float, L: ArrayLike) -> ArrayLike:
-        dL = L.dot(self.UtAU) + self.B.dot(L) + self.CCtU
+        dL = L.dot(self.UtAU) + self.B.dot(L) + self.CU
         return dL
 
     def ode_S(self, t: float, S: ArrayLike) -> ArrayLike:
-        dS = self.UtAU.dot(S) + S.dot(self.VtBV) + self.UtCCtV
+        dS = self.UtAU.dot(S) + S.dot(self.VtBV) + self.UtCV
         return dS
 
-    def linear_field(self, t: float, Y: LowRankMatrix) -> LowRankMatrix:
+    def linear_field(self, t: float, Y: SVD) -> SVD:
         "Linear field of the equation"
         AX = Y.dot_sparse(self.A, side='opposite')
         XB = Y.dot_sparse(self.B, side='usual')
         return AX + XB
 
-    def non_linear_field(self, t: float, Y: LowRankMatrix) -> LowRankMatrix:
+    def non_linear_field(self, t: float, Y: SVD) -> SVD:
         "Non linear field of the equation"
-        return self.CCt
+        return self.C
 
-    def low_rank_ode_F(self, t: float, Y: LowRankMatrix) -> LowRankMatrix:
-        dY = self.linear_field(t, Y) + self.non_linear_field(t, Y)
-        return dY
-
-    def project_ode_F(self, Y: LowRankMatrix) -> LowRankMatrix:
+    def projected_ode_F(self, t: float, Y: SVD) -> SVD:
         "Compute P(Y)[F(Y)]"
+        # VARIABLES
         A, B, C = self.A, self.B, self.C
-        U, Vt = Y.U, Y.Vt
-        AY = Y.dot_sparse(A, side='opposite')
-        YB = Y.dot_sparse(B, side='usual')
-        UUtCCt = self.CCt.dot(U.T, side='opposite').dot(U, side='opposite')
-        UUtCCtVVt = UUtCCt.dot(Vt.T).dot(Vt)
-        CCtVVt = self.CCt.dot(Vt.T).dot(Vt)
-        PFX = svd.add_svd([AY, YB, UUtCCt, -UUtCCtVVt, CCtVVt])
-        # PFX = AX + XB + UUtCCt - UUtCCtVVt + CCtVVt # this option may be is faster for very large n and k
-        return PFX
+        U, S, V = Y.U, Y.S, Y.Vt.T
+        
+        # STEP 1 : FACTORIZATION
+        AUS = A.dot(U.dot(S))
+        CV = C.dot(V).todense()
+        UUtCV = np.linalg.multi_dot([U, U.T, CV])
+        M1 = np.column_stack([AUS - UUtCV + CV, U])
+        SVtB = B.T.dot(V.dot(S.T)).T
+        UtC = C.dot(U.T, side='opposite').todense()
+        M2 = np.row_stack([V.T, SVtB + UtC])
+        
+        # STEP 2 : DOUBLE QR
+        Q1, R1 = la.qr(M1, mode='reduced')
+        Q2, R2 = la.qr(M2.T, mode='reduced')
+        return SVD(Q1, R1.dot(R2.T), Q2.T)
+
 
     # %% CLOSED FORM SOLUTIONS
     def closed_form_solution(self, t_span: tuple, XKSL0: Union[ArrayLike, SVD]) -> Union[ArrayLike, SVD]:
@@ -139,7 +172,7 @@ class SylvesterIVP(GeneralIVP):
             t_span (tuple): time interval (t0, t1)
             X0 (Union[ArrayLike, SVD]): low-rank matrix of shape (m,n)
         """
-        return closed_form_invertible_diff_sylvester(t_span, X0, self.A, self.B, self.CCt)
+        return closed_form_invertible_diff_sylvester(t_span, X0, self.A, self.B, self.C)
     
     def closed_form_projected_ode(self, t_span: tuple, KSL0: ArrayLike) -> ArrayLike:
         """Closed form solution of the projected ode
@@ -151,43 +184,44 @@ class SylvesterIVP(GeneralIVP):
         if self.current_ode_type == "K":
             A = self.A
             B = self.VtBV
-            C = self.CCtV
+            C = self.CV
         elif self.current_ode_type == "L":
             A = self.B
             B = self.UtAU
-            C = self.CCtU
+            C = self.CU
         elif self.current_ode_type == "S":
             A = self.UtAU
             B = self.VtBV
-            C = self.UtCCtV
+            C = self.UtCV
         elif self.current_ode_type == "minus_S":
             A = -self.UtAU
             B = -self.VtBV
-            C = -self.UtCCtV
+            C = -self.UtCV
         KSL1 = closed_form_invertible_diff_sylvester(t_span, KSL0, A, B, C)
         return KSL1
     
     
-    def stiff_solution(self, t_span: tuple, initial_value: LowRankMatrix) -> LowRankMatrix:
+    def stiff_solution(self, t_span: tuple, Y0: LowRankMatrix) -> LowRankMatrix:
         "Solution of the stiff part of the ODE"
         A = self.A
         B = self.B
         h = t_span[1] - t_span[0]
-        X_tilde = initial_value.expm_multiply(A, h, side='left')
-        X1 = X_tilde.expm_multiply(B, h, side='right')
-        return X1
+        Y_tilde = Y0.expm_multiply(A, h, side='left')
+        Y1 = Y_tilde.expm_multiply(B, h, side='right')
+        return Y1
 
-    def non_stiff_solution(self, t_span: tuple, initial_value: SVD) -> SVD:
+    def non_stiff_solution(self, t_span: tuple, Y0: SVD) -> SVD:
         "Solution of the non stiff part of the ODE"
         h = t_span[1] - t_span[0]
-        CCt = self.non_linear_field(0, initial_value, output='SVD')
-        return h * CCt + initial_value
+        return h * self.C + Y0
 
 
 # %% SYLVESTER RELATED METHODS
 
 def solve_small_sylvester(A: ArrayLike, B: ArrayLike, RHS: ArrayLike) -> ArrayLike:
     "Shortcut for solve_sylvester function from scipy. Find X such that AX + XB = RHS"
+    if isinstance(RHS, LowRankMatrix):
+        RHS = RHS.todense()
     return sla.solve_sylvester(A, B, RHS)
 
 def solve_sparse_low_rank_sylvester(A: spmatrix,
@@ -213,8 +247,8 @@ def solve_sparse_low_rank_sylvester(A: spmatrix,
     normA = spala.norm(A)
     normB = spala.norm(B)
     normRHS = RHS.norm()
-    left_space = krylov.KrylovSpace(A, RHS._matrices[0], invA, inverted=True)
-    right_space = krylov.KrylovSpace(B, RHS._matrices[-1].T, invB, inverted=True)
+    left_space = krylov.KrylovSpace(A, RHS._matrices[0], invA)
+    right_space = krylov.KrylovSpace(B, RHS._matrices[-1].T, invB)
     V = left_space.Q
     W = right_space.Q
 
@@ -270,8 +304,8 @@ def solve_sylvester(A: Union[ArrayLike, spmatrix],
                     RHS: Union[ArrayLike, SVD],
                     invA: object = None,
                     invB: object = None) -> Union[ArrayLike, SVD]:
-    """Solve the Sylvester equation AX + XB = RHS.
-    Automagically choose the adapted method for solving the equation efficiently.
+    """Solve the sylvester equation AX + XB = RHS.
+    Automatically choose the adapted method for solving the equation efficiently.
 
     Args:
         A (Union[ArrayLike, spmatrix]): matrix of shape (n,n)
@@ -302,7 +336,7 @@ def closed_form_invertible_diff_sylvester(t_span: tuple,
                                           A: Union[ArrayLike, spmatrix],
                                           B: Union[ArrayLike, spmatrix],
                                           C: Union[ArrayLike, SVD]) -> Union[ArrayLike, SVD]:
-    """Closed form solution of the Sylvester differential equation.
+    """Closed form solution of the sylvester differential equation.
     X' = AX + XB + C
     X(t0) = X0
     

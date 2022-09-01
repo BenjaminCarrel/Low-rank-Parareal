@@ -37,6 +37,7 @@ The general installation setting is:
   - matplotlib (3.5)
   - jupyter (1.0)
   - tqdm (4.63)
+  - joblib (1.1)
 - Add the folder `src` to your python path to be able to import the code inside
 
 Then, you should be able to run the files of the experiments.
@@ -82,7 +83,8 @@ conda install numpy scipy "libblas=*=*accelerate"
 Finally, install other packages and add `src` to the path
 
 ```
-conda install jupyter tqdm matplotlib conda-build
+conda install jupyter tqdm matplotlib conda-build pip
+pip install joblib
 conda develop src
 ```
 

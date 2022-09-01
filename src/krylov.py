@@ -1,9 +1,10 @@
 # %% IMPORTATIONS
 from re import X
+from types import NoneType
 from typing import List, Tuple, Union, Optional
 
 import numpy as np
-import numpy.linalg as la
+import scipy.linalg as la
 from scipy.sparse import spmatrix
 import scipy.sparse.linalg as spala
 from low_rank_toolbox import svd
@@ -11,7 +12,6 @@ from numpy.typing import ArrayLike
 
 
 # %% KRYLOV CLASSES
-
 class KrylovVector:
 
     def __init__(self, A: ArrayLike, v: ArrayLike) -> None:
@@ -210,7 +210,7 @@ class KrylovMatrix:
             self.symmetric = False
 
         # FIRST BASIS
-        Q, H = la.qr(V, mode='reduced')
+        Q = la.orth(V)
         self.Q = Q
         # self.H = H # Storing H is useless except if you need its data
 
@@ -221,7 +221,7 @@ class KrylovMatrix:
         r = self.r
         self.size = self.size+1
         m = self.size
-        Q = np.zeros((self.n, m*r))
+        Q = np.zeros((self.n, m*r), dtype=A.dtype)
         Q[:, :(m-1)*r] = self.Q
         H = np.empty(m, dtype=object)
 
@@ -231,7 +231,7 @@ class KrylovMatrix:
         for i in np.arange(m-1):
             H[i] = Q[:, i*r:(i+1)*r].T.dot(Wj)
             Wj = Wj - Q[:, i*r:(i+1)*r].dot(H[i])
-        Q[:, (m-1)*r:m*r], H[m-1] = la.qr(Wj, mode='reduced')
+        Q[:, (m-1)*r:m*r], _ = la.qr(Wj, mode='economic')
 
         # UPDATE DATA
         self.Q = Q
@@ -262,7 +262,7 @@ class KrylovInvertedMatrix:
 
         # FIRST BASIS
         V = self.invdot(V)
-        Q, H = la.qr(V, mode='reduced')
+        Q = la.orth(V)
         self.Q = Q
         # self.H = H # Storing H is useless except if you need its data
 
@@ -285,7 +285,7 @@ class KrylovInvertedMatrix:
         r = self.r
         self.size = self.size+1
         m = self.size
-        Q = np.zeros((self.n, m*r))
+        Q = np.zeros((self.n, m*r), dtype=A.dtype)
         Q[:, :(m-1)*r] = self.Q
         H = np.empty(m, dtype=object)
 
@@ -295,7 +295,7 @@ class KrylovInvertedMatrix:
         for i in np.arange(m-1):
             H[i] = Q[:, i*r:(i+1)*r].T.dot(Wj)
             Wj = Wj - Q[:, i*r:(i+1)*r].dot(H[i])
-        Q[:, (m-1)*r:m*r], H[m-1] = la.qr(Wj, mode='reduced')
+        Q[:, (m-1)*r:m*r], _ = la.qr(Wj, mode='economic')
 
         # UPDATE DATA
         self.Q = Q
@@ -303,7 +303,7 @@ class KrylovInvertedMatrix:
 
 class KrylovSpace:
 
-    def __init__(self, A: ArrayLike, V: ArrayLike, invA: Optional[object] = None, inverted: bool = False) -> None:
+    def __init__(self, A: ArrayLike, V: ArrayLike, invA: Optional[object] = None) -> None:
         """Krylov Space, potentially inverted.
         Supports matrix or vector V.
         Krylov Space : K(A,V) = span(V, AV, ..., A^{k-1} V)
@@ -324,7 +324,10 @@ class KrylovSpace:
         self.n = V.shape[0]
         self.r = V.shape[1]
         self.invA = invA
-        self.inverted = inverted
+        if isinstance(invA, NoneType):
+            self.inverted = False
+        else:
+            self.inverted = True
 
         # INITIALIZE KRYLOV SPACES
         self.size = 1
@@ -333,11 +336,11 @@ class KrylovSpace:
         if len(V.shape) == 2:
             if V.shape[1] > 1:
                 KS = KrylovMatrix(A, V)
-            if inverted:
+            if self.inverted:
                 KS_inv = KrylovInvertedMatrix(A, V, invA)
         else:
             KS = KrylovVector(A, V)
-            if inverted:
+            if self.inverted:
                 KS_inv = KrylovInvertedVector(A, V, invA)
         self.KS = KS
         self.KS_inv = KS_inv
@@ -359,8 +362,7 @@ class KrylovSpace:
 
         # Inverted space : we have to do a QR
         elif self.Q_precomputed.shape[1] != 2 * self.r * self.size:
-            Q, _ = la.qr(np.column_stack(
-                [self.KS.Q, self.KS_inv.Q]), mode='reduced')
+            Q = la.orth(np.column_stack([self.KS.Q, self.KS_inv.Q]))
             self.Q_precomputed = Q
         return self.Q_precomputed
 
@@ -373,3 +375,223 @@ class KrylovSpace:
             self.KS_inv.compute_next_basis()
 
 
+# %% KRYLOV RELATED METHODS
+def Arnoldi(A: ArrayLike, v: ArrayLike, k: int) -> Tuple[ArrayLike, ArrayLike, ArrayLike]:
+    """Arnoldi algorithm. Computes orthogonal basis of a Krylov space. See Martin J. Gander lecture.
+
+    Args:
+        A (ArrayLike): Matrix of shape (n,n)
+        v (ArrayLike): Vector of shape (n,)
+        k (int): Size of the Krylov space to compute.
+
+    Returns:
+        Q (ArrayLike): Orthogonal matrix such that span(v, Av, ..., A**{k-1}v) = span(q[:,1], ..., q[:,k])
+        H (ArrayLike): Additional data
+        u (ArrayLike): Additional data
+    """
+    # CREATE VARIABLES
+    n = A.shape[0]
+    Q = np.zeros((n, k))
+    H = np.zeros((k+1, k))
+
+    # Arnoldi Algorithm, see Iterative methods by Martin J. Gander
+    Q[:, 0] = v / la.norm(v)
+    for j in range(k):
+        u = A.dot(Q[:, j])
+        for i in range(j+1):
+            H[i, j] = Q[:, i].T.dot(u)
+            u = u - H[i, j] * Q[:, i]
+        if j < k-1:
+            H[j+1, j] = la.norm(u)
+            if H[j+1, j] < 1e-15:
+                print('Lucky breakdown.')
+                break
+            Q[:, j+1] = u/H[j+1, j]
+    return Q, H, u
+
+
+def Arnoldi_inverted(invA: object, v: ArrayLike, k: int) -> Tuple[ArrayLike, ArrayLike, ArrayLike]:
+    """Arnoldi algorithm. Computes orthogonal basis of a Krylov space. See Martin J. Gander lecture.
+
+    Args:
+        invA (ArrayLike): object of inverse matrix A with solve function
+        v (ArrayLike): Vector of shape (n,)
+        k (int): Size of the Krylov space to compute.
+
+    Returns:
+        Q (ArrayLike): Orthogonal matrix such that span(v, Av, ..., A**{k-1}v) = span(q[:,1], ..., q[:,k])
+        H (ArrayLike): Additional data
+        u (ArrayLike): Additional data
+    """
+    # CREATE VARIABLES
+    n = v.shape[0]
+    Q = np.zeros((n, k))
+    H = np.zeros((k+1, k))
+
+    # Arnoldi Algorithm, see Iterative methods by Martin J. Gander
+    Q[:, 0] = v / la.norm(v)
+    for j in range(k):
+        u = invA.solve(Q[:, j])
+        for i in range(j+1):
+            H[i, j] = Q[:, i].T.dot(u)
+            u = u - H[i, j] * Q[:, i]
+        if j < k-1:
+            H[j+1, j] = la.norm(u)
+            if H[j+1, j] < 1e-15:
+                print('Lucky breakdown.')
+                break
+            Q[:, j+1] = u/H[j+1, j]
+    return Q, H, u
+
+
+def block_Arnoldi(A: ArrayLike, V: ArrayLike, m: int) -> Tuple[ArrayLike, ArrayLike]:
+    """Block Arnoldi algorithm. See Saad, Algorithm 6.23
+
+    Args:
+        A (ArrayLike): Matrix of shape (n,n)
+        V (ArrayLike): Matrix of shape (n,r)
+        m (int): number of iterations
+
+    Returns:
+        Q (ArrayLike): Orthogonal matrix
+        H (ArrayLike): Additional data
+    """
+    # CREATE VARIABLE
+    n = A.shape[0]
+    r = V.shape[1]
+    Q = np.zeros((n, m*r))
+    H = np.empty((m, m-1), dtype=object)
+
+    # Arnoldi Algorithm
+    Q[:, :r] = la.orth(V)
+    for j in range(m-1):
+        Wj = A.dot(Q[:, j*r:(j+1)*r])
+        for i in range(j+1):
+            H[i, j] = Q[:, i*r:(i+1)*r].T.dot(Wj)
+            Wj = Wj - Q[:, i*r:(i+1)*r].dot(H[i, j])
+        Q[:, (j+1)*r:(j+2)*r] = la.orth(Wj)
+    return Q, H
+
+
+def block_Arnoldi_inverted(invA: object, V: ArrayLike, m: int) -> Tuple[ArrayLike, ArrayLike]:
+    """Block Arnoldi algorithm. See Saad, Algorithm 6.23
+
+    Args:
+        invA (ArrayLike): inverse object of matrix A with a solve function
+        V (ArrayLike): Matrix of shape (n,r)
+        m (int): number of iterations
+
+    Returns:
+        Q (ArrayLike): Orthogonal matrix
+        H (ArrayLike): Additional data
+    """
+    # CREATE VARIABLE
+    (n, r) = V.shape
+    Q = np.zeros((n, m*r))
+    H = np.empty((m, m-1), dtype=object)
+
+    # Arnoldi Algorithm
+    Q[:, :r] = la.orth(V)
+    for j in range(m-1):
+        Wj = invA.solve(Q[:, j*r:(j+1)*r])
+        for i in range(j+1):
+            H[i, j] = Q[:, i*r:(i+1)*r].T.dot(Wj)
+            Wj = Wj - Q[:, i*r:(i+1)*r].dot(H[i, j])
+        Q[:, (j+1)*r:(j+2)*r], H[j+1, j] = la.qr(Wj, mode='reduced')
+    return Q, H
+
+
+def Lanczos(A: ArrayLike, v: ArrayLike, k: int) -> Tuple[ArrayLike, ArrayLike, ArrayLike, ArrayLike]:
+    """Lanczos algorithm. Computes orthogonal basis of a Krylov space when A is symmetric.
+
+    Args:
+        A (ArrayLike): Symmetric matrix of size (n,n)
+        v (ArrayLike): Vector of size (n,)
+        k (int): Size of the Krylov space to compute.
+
+    Returns:
+        Q (ArrayLike): Orthogonal matrix such that span(v, Av, ..., A**{k-1}v) = span(q[:,1], ..., q[:,k])
+        alpha (ArrayLike): Additional data
+        beta (ArrayLike): Additional data
+        u (ArrayLike): Additional data
+    """
+    # CREATE VARIABLES
+    n = A.shape[0]
+    Q = np.zeros((n, k))
+    alpha = np.zeros(k)
+    beta = np.zeros(k-1)
+
+    # Lanczos Algorithm, see Iterative methods by Martin J. Gander
+    Q[:, 0] = v / la.norm(v)
+    for j in range(k):
+        u = A.dot(Q[:, j])
+        alpha[j] = Q[:, j].T.dot(u)
+        u = u - alpha[j] * Q[:, j]
+        if j > 0:
+            u = u - beta[j-1] * Q[:, j-1]
+        if j < k-1:
+            beta[j] = la.norm(u)
+            Q[:, j+1] = u / beta[j]
+    return Q, alpha, beta, u
+
+
+def Lanczos_inverted(invA: object, v: ArrayLike, k: int) -> Tuple[ArrayLike, ArrayLike, ArrayLike, ArrayLike]:
+    """Lanczos algorithm. Computes orthogonal basis of a Krylov space when A is symmetric.
+
+    Args:
+        invA (object): object inverse of matrix A with solve function
+        v (ArrayLike): Vector of size (n,)
+        k (int): Size of the Krylov space to compute.
+
+    Returns:
+        Q (ArrayLike): Orthogonal matrix such that span(v, Av, ..., A**{k-1}v) = span(q[:,1], ..., q[:,k])
+        alpha (ArrayLike): Additional data
+        beta (ArrayLike): Additional data
+        u (ArrayLike): Additional data
+    """
+    # CREATE VARIABLES
+    n = v.shape[0]
+    Q = np.zeros((n, k))
+    alpha = np.zeros(k)
+    beta = np.zeros(k-1)
+
+    # Lanczos Algorithm, see Iterative methods by Martin J. Gander
+    Q[:, 0] = v / la.norm(v)
+    for j in range(k):
+        u = invA.solve(Q[:, j])
+        alpha[j] = Q[:, j].T.dot(u)
+        u = u - alpha[j] * Q[:, j]
+        if j > 0:
+            u = u - beta[j-1] * Q[:, j-1]
+        if j < k-1:
+            beta[j] = la.norm(u)
+            Q[:, j+1] = u / beta[j]
+    return Q, alpha, beta, u
+
+
+def Givens():
+    return NotImplementedError
+
+
+def Householder():
+    return NotImplementedError
+
+
+def modified_gram_schmidt():
+    return NotImplementedError
+
+
+# %% SHORTCUTS
+def compute_krylov_space_basis(k: int, A: ArrayLike, V: ArrayLike, invA: object = None):
+    """Compute the basis of Krylov space of size k
+
+    Args:
+        k (int): size of krylov space
+        A (ArrayLike): Matrix of shape (n,n)
+        V (ArrayLike): Matrix of shape(n,r)
+        invA (object, optional): Inverse of matrix A with solve function. Defaults to None.
+    """
+    KS = KrylovSpace(A, V, invA)
+    for _ in range(k-1):
+        KS.compute_next_basis()
+    return KS.Q

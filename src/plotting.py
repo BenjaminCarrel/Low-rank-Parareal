@@ -5,6 +5,7 @@ import numpy.linalg as la
 from matplotlib import pyplot as plt, cm
 import scipy.io as sio
 import matplotlib as mpl
+from low_rank_toolbox.svd import SVD
 
 
 
@@ -118,10 +119,9 @@ def singular_values(time: list,
     shape = solution[0].shape
     sing_vals = np.zeros([nb_t_steps, min(shape)])
     for j in np.arange(nb_t_steps):
-        try:
-            sing_vals[j] = solution[j].S
-        except:
-            sing_vals[j] = la.svd(solution[j], compute_uv=False)
+        if isinstance(solution[j], SVD):
+            solution[j] = solution[j].todense()
+        sing_vals[j] = la.svd(solution[j], compute_uv=False)
 
     # PLOT SINGULAR VALUES
     fig, ax = plt.subplots(1, dpi=100)
@@ -182,7 +182,7 @@ def animation_3D(x, y, sol_to_plot, title, do_save=False):
     x,y : ndarray
         Vectors of space
     sol_to_plot: ndarray
-        Array containg the solution with coordinates (xs,y,ts)
+        Array containg the solution with coordinates (ts,fx,fy)
     title: str
         Title of animation
 
@@ -210,50 +210,3 @@ def animation_3D(x, y, sol_to_plot, title, do_save=False):
         anim3d.save(title, fps=30)
     return anim3d
 
-#%% COOKIE ANIMATION PLOT
-def animation_cookie(times, solutions):
-    """
-    Animation template for the cookie problem.
-    Reference: https://stackoverflow.com/questions/16915966/using-matplotlib-animate-to-animate-a-contour-plot-in-python
-    Beware - this might take a while even 10 mins.
-    """
-    # Import data
-    problem_cookie = sio.loadmat('resources/parametric_cookie_2x2_1580.mat')
-    # Construct a triangulation. The triangles are indexed by 1,2, ... in MATLAB hence -1
-    FreeDofs = problem_cookie['FreeDofs'][0]
-    U_bd = problem_cookie['U_bd'].astype(np.float64).reshape(-1)  # we need floating points, not integers
-    mesh_elements = problem_cookie['Mesh']['Elements'][0][0]
-    mesh_coordinates = problem_cookie['Mesh']['Coordinates'][0][0]
-    tri = mpl.tri.Triangulation(x=mesh_coordinates[:, 0], y=mesh_coordinates[:, 1], triangles=mesh_elements - 1)
-
-    # Combine solution with boundary solution.
-    def add_boundary(y):
-        u = U_bd.copy()  # just to be sure, copy
-        u[FreeDofs - 1] = y  # MATLAB indices start with 1
-        return u
-
-    def cookies_data(i):  # function returns data to plot
-        y = solutions[i]
-        y_bd = add_boundary(y)
-        return y_bd
-
-    # FIRST IMAGE
-    fig = plt.figure(figsize=(10, 8), dpi=80, facecolor='w', edgecolor='k')
-    ax = plt.axes(xlim=(0, 4), ylim=(0, 4), xlabel='x', ylabel='y')
-    ax.triplot(tri, lw=0.2, color='white')
-    tcf = ax.tricontourf(tri, cookies_data(0)) # , levels=color_levels
-    fig.colorbar(tcf)
-
-    def animate(i):  # animation function
-        global tcf
-        u = cookies_data(i)
-        for c in tcf.collections:
-            c.remove()  # removes only the contours, leaves the rest intact
-        ax.triplot(tri, lw=0.01, color='white')
-        tcf = ax.tricontourf(tri, u) # , levels=color_levels
-        plt.title('time = {}'.format(times[i]))
-        return tcf
-
-    anim = animation.FuncAnimation(fig, animate, frames=Nt, repeat=False)
-    anim.save('figures/animation_cookie.gif')
-    return anim
