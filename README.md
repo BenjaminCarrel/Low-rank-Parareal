@@ -6,13 +6,13 @@ The Parareal algorithm of Lions, Maday, and Turinici is a well-known time parall
 
 ## Authors
 
-- Benjamin Carrel (University of Geneva)
-- Martin J. Gander (University of Geneva)
-- Bart Vandereycken (Univerity of Geneva)
+- [Benjamin Carrel](https://www.carrel.world) (University of Geneva)
+- [Martin J. Gander](https://www.unige.ch/~gander/) (University of Geneva)
+- [Bart Vandereycken](https://www.unige.ch/math/vandereycken/) (Univerity of Geneva)
 
-## References
+## Reference
 
-(Update when published)
+- [Carrel, B., Gander, M. J., & Vandereycken, B. (2023). Low-rank Parareal: a low-rank parallel-in-time integrator. BIT Numerical Mathematics, 63(1), 13.](https://link.springer.com/article/10.1007/s10543-023-00953-3)
 
 ## Installation
 
