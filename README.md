@@ -12,7 +12,38 @@ The Parareal algorithm of Lions, Maday, and Turinici is a well-known time parall
 
 ## Reference
 
-- [Carrel, B., Gander, M. J., & Vandereycken, B. (2023). Low-rank Parareal: a low-rank parallel-in-time integrator. BIT Numerical Mathematics, 63(1), 13.](https://link.springer.com/article/10.1007/s10543-023-00953-3)
+The paper is now published here:
+[Carrel, B., Gander, M. J., & Vandereycken, B. (2023). Low-rank Parareal: a low-rank parallel-in-time integrator. BIT Numerical Mathematics, 63(1), 13.](https://link.springer.com/article/10.1007/s10543-023-00953-3)
+
+To cite it, you can use the following Bibtex template:
+```
+@article{carrel2023low,
+  title={Low-rank Parareal: a low-rank parallel-in-time integrator},
+  author={Carrel, Benjamin and Gander, Martin J and Vandereycken, Bart},
+  journal={BIT Numerical Mathematics},
+  volume={63},
+  number={1},
+  pages={13},
+  year={2023},
+  publisher={Springer}
+}
+```
+
+You may also want to cite the code specifically, which you can do with the DOI number generated on [Zenodo](https://zenodo.org/records/10262105). The following Bibtex template refers to that Zenodo release:
+```
+@software{benjamin_carrel_2023_10262105,
+  author       = {Benjamin Carrel},
+  title        = {{BenjaminCarrel/Low-rank-Parareal: Zenodo Release 
+                   1.0}},
+  month        = dec,
+  year         = 2023,
+  publisher    = {Zenodo},
+  version      = {Zenodo},
+  doi          = {10.5281/zenodo.10262105},
+  url          = {https://doi.org/10.5281/zenodo.10262105}
+}
+```
+
 
 ## Installation
 
