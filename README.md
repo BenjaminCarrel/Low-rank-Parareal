@@ -6,7 +6,7 @@ The Parareal algorithm of Lions, Maday, and Turinici is a well-known time parall
 
 ## Authors
 
-- [Benjamin Carrel](https://www.carrel.world) (University of Geneva)
+- [Benjamin Carrel](https://benjamincarrel.github.io) (University of Geneva)
 - [Martin J. Gander](https://www.unige.ch/~gander/) (University of Geneva)
 - [Bart Vandereycken](https://www.unige.ch/math/vandereycken/) (Univerity of Geneva)
 
