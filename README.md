@@ -129,10 +129,17 @@ For convenience, the output are pre-computed, so you don't need to run the code 
 All parameters are set by default as described in the paper. Therefore, the figures produced should be the same as in the paper.
 If one of the notebook does not run on your computer, please send an e-mail to benjamin.carrel@unige.ch
 
+## License
 
+Low-rank Parareal is copyright by Benjamin Carrel and
+is distributed under the terms of the GNU General Public
+License (GPL) version 3 (or later). See accompanying file `LICENSE` or
+<http://www.gnu.org/licenses/gpl.html>.
 
-
-
-
-
+In short, this means that everyone is free to use Low-rank Parareal, to modify it and
+to redistribute it on a free basis. It is not in the public domain;
+it is copyrighted and there are restrictions on its distribution (see the
+license). For example, you cannot integrate this version (in full
+or in parts) in any closed-source software you plan to distribute
+(commercially or not). Please contact us for more information.
 
